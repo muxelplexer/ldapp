@@ -6,7 +6,7 @@
 namespace ldapp
 {
     instance::instance(const std::string_view ldap_path, const std::string_view binddn, const std::string_view password)
-        : m_Ptr{std::move(instance::initialize(ldap_path))}
+        : m_Ptr{std::move(ldap_ptr(instance::initialize(ldap_path)))}
     {
         int ldap_version = 3;
         ldap_set_option(this->m_Ptr.get(), LDAP_OPT_PROTOCOL_VERSION, &ldap_version);
@@ -16,8 +16,7 @@ namespace ldapp
 
     void instance::connect()
     {
-        result rc{ldap_connect(this->m_Ptr.get())};
-        if (results::is_error(rc)) throw ldapp::exception(rc);
+        handle_ldap_function(ldap_connect, this->m_Ptr.get());
         this->m_Connected = true;
     }
 
@@ -39,12 +38,19 @@ namespace ldapp
              rc == handle_ldap_function(ldap_get_attribute_ber, this->m_Ptr.get(), entry, ber, &bv, bvalsp))
         {
             if (bv.bv_val == nullptr) break;
-            for (auto i = 0; bvals[i].bv_val != nullptr; ++i)
+            if (bvals)
             {
-                std::cout << "\t" <<  bv.bv_val << ": \"" << bvals[i].bv_val << "\"\n";
+                for (auto i = 0; bvals[i].bv_val != nullptr; ++i)
+                {
+                    std::cout << "\t" <<  bv.bv_val << ": \"" << bvals[i].bv_val << "\"\n";
+                }
+                ber_memfree(bvals);
             }
 
         }
+
+        if (ber) ber_free(ber, 0);
+
     }
     void instance::sasl_bind(const std::string_view binddn, const std::string_view password)
     {
@@ -62,8 +68,6 @@ namespace ldapp
         {
             std::cerr << e.what() << '\n';
         }
-        
-
     }
 
     void instance::search(const std::string& searchdn, const std::string_view search_filter)
@@ -100,14 +104,15 @@ namespace ldapp
             print_entry(msg);
         }
 
+        ldap_msgfree(res);
     }
 
-    ldap_ptr instance::initialize(const std::string_view ldap_path)
+    LDAP* instance::initialize(const std::string_view ldap_path)
     {
         LDAP* ptr = nullptr;
-        
-        if(ldap_initialize(&ptr, ldap_path.data()) != LDAP_SUCCESS) throw std::runtime_error("Could not initialize LDAP Connection...");
-        return ldap_ptr(ptr);
+        const std::string ldap_path_s{ldap_path};
+        if(ldap_initialize(&ptr, ldap_path_s.c_str()) != LDAP_SUCCESS) throw std::runtime_error("Could not initialize LDAP Connection...");
+        return ptr;
     }
 
 

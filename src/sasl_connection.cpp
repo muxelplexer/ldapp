@@ -11,9 +11,6 @@ namespace ldapp
         passwd.bv_val = ber_strdup(password.c_str());
         passwd.bv_len = strlen(passwd.bv_val);
 
-        berval* servercredp;
-
-
         handle_ldap_function(
             ldap_sasl_bind_s,
             this->m_LDAP,
@@ -24,5 +21,7 @@ namespace ldapp
             nullptr,
             nullptr
         );
+
+        free(passwd.bv_val);
     }
 }
