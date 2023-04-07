@@ -6,7 +6,3 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 find_package(OpenLdap REQUIRED)
 
 add_subdirectory(src)
-target_include_directories(ldapp
-    PUBLIC
-        ${CMAKE_SOURCE_DIR}/inc
-)

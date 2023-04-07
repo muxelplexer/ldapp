@@ -5,18 +5,20 @@
 
 namespace ldapp
 {
-    instance::instance(const std::string_view ldap_path)
+    instance::instance(const std::string_view ldap_path, const std::string_view binddn, const std::string_view password)
         : m_Ptr{std::move(instance::initialize(ldap_path))}
     {
         int ldap_version = 3;
         ldap_set_option(this->m_Ptr.get(), LDAP_OPT_PROTOCOL_VERSION, &ldap_version);
-        this->sasl_bind();
+        this->connect();
+        this->sasl_bind(binddn, password);
     }
 
     void instance::connect()
     {
         result rc{ldap_connect(this->m_Ptr.get())};
         if (results::is_error(rc)) throw ldapp::exception(rc);
+        this->m_Connected = true;
     }
 
     void instance::print_entry(LDAPMessage* entry)
@@ -44,44 +46,42 @@ namespace ldapp
 
         }
     }
-    void instance::sasl_bind()
+    void instance::sasl_bind(const std::string_view binddn, const std::string_view password)
     {
-        LDAPControl* srv_ctr = nullptr;
-        LDAPControl* clt_ctr = nullptr;
-        LDAPMessage* message = nullptr;
-        int msgid = 0;
-        const char* rmech = nullptr;
+        if (!this->m_Connected) throw std::runtime_error("Can't bind: No connection is opened");
+        try
+        {
+            this->m_Con = std::make_unique<sasl_connection>(
+                this->m_Ptr.get(),
+                binddn,
+                std::move(std::string(password))
+            );
+            this->m_Bound = true;
+        }
+        catch(const std::runtime_error& e)
+        {
+            std::cerr << e.what() << '\n';
+        }
+        
 
-        result rc;
-        std::string_view password{};
-        berval  passwd;
-        berval* servercred;
-        passwd.bv_val = ber_strdup(password.begin());
-        passwd.bv_len = strlen(passwd.bv_val);
+    }
 
-        handle_ldap_function(
-            ldap_sasl_bind_s,
-            this->m_Ptr.get(),
-            "",
-            LDAP_SASL_SIMPLE,
-            &passwd,
-            &srv_ctr,
-            &clt_ctr,
-            &servercred
-        );
-
-        this->m_SCtrl = control_ptr(std::move(srv_ctr));
-        this->m_CCtrl = control_ptr(std::move(clt_ctr));
-
+    void instance::search(const std::string& searchdn, const std::string_view search_filter)
+    {
+        using namespace std::literals;
         LDAPMessage* res = nullptr;
         timeval timeout{.tv_sec = 15};
+
+        std::string filter{"(objectClass="sv};
+        filter += search_filter;
+        filter += ")";
 
         handle_ldap_function(
             ldap_search_ext_s,
             this->m_Ptr.get(),
-            "",
+            searchdn.c_str(),
             LDAP_SCOPE_SUBTREE,
-            "(objectClass=*)",
+            filter.c_str(),
             nullptr,
             0,
             nullptr,
@@ -99,14 +99,8 @@ namespace ldapp
             std::cout << "Object:\n";
             print_entry(msg);
         }
-    }
-
-    void instance::sasl_unbind()
-    {
 
     }
-
-
 
     ldap_ptr instance::initialize(const std::string_view ldap_path)
     {

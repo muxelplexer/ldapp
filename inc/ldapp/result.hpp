@@ -62,6 +62,7 @@ namespace ldapp
         };
         constinit static int api_messages_size = api_messages.size();
     };
+
     enum class result
     {
         SUCCESS                         = LDAP_SUCCESS,
@@ -138,5 +139,6 @@ namespace ldapp
             else return *(msg_iterator + res_code);
         }
     }
+
 
 }

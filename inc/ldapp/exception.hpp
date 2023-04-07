@@ -15,4 +15,13 @@ namespace ldapp
         std::string_view error;
     };
 
+    inline result handle_ldap_function(auto function, auto... args)
+    {
+        result rc = static_cast<result>(function(
+            std::forward<decltype(args)>(args)...
+        ));
+
+        if (results::is_error(rc)) throw ldapp::exception(rc);
+        return rc;
+    }
 }

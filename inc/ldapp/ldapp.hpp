@@ -10,6 +10,7 @@
 #include <ldap.h>
 #include "ldapp/exception.hpp"
 #include "ldapp/result.hpp"
+#include "ldapp/sasl_connection.hpp"
 
 namespace ldapp
 {
@@ -23,15 +24,6 @@ namespace ldapp
         void operator()(LDAPControl* ptr) { ldap_control_free(ptr); };
     };
 
-    inline result handle_ldap_function(auto function, auto... args)
-    {
-        result rc = static_cast<result>(function(
-            std::forward<decltype(args)>(args)...
-        ));
-
-        if (results::is_error(rc)) throw ldapp::exception(rc);
-        return rc;
-    }
 
 
     using control_ptr = std::unique_ptr<LDAPControl, control_deleter>;
@@ -41,14 +33,15 @@ namespace ldapp
     class instance
     {
     public:
-        instance(const std::string_view ldap_path);
+        instance(const std::string_view ldap_path, const std::string_view binddn, const std::string_view password);
         instance(const instance& inst) = delete;
         const instance& operator=(const instance& inst) = delete;
         operator LDAP*() { return this->m_Ptr.get(); }
 
         void connect();
-        void sasl_bind();
-        void sasl_unbind();
+        void sasl_bind(const std::string_view binddn, const std::string_view pasword);
+
+        void search(const std::string& searchdn, const std::string_view search_filter);
 
 
 
@@ -61,5 +54,8 @@ namespace ldapp
         control_ptr m_SCtrl = nullptr;
         control_ptr m_CCtrl = nullptr;
         ldap_ptr m_Ptr = nullptr;
+        std::unique_ptr<sasl_connection> m_Con = nullptr;
+        bool m_Connected = false;
+        bool m_Bound = false;
     };
 }
