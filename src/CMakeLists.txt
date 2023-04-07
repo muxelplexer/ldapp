@@ -10,3 +10,4 @@ target_include_directories(ldapp
 add_library(ldapp::ldapp ALIAS ldapp)
 
 target_compile_features(ldapp PUBLIC cxx_std_23)
+target_link_libraries(ldapp ldap lber)
