@@ -1,6 +1,8 @@
 #include "ldapp/ldapp.hpp"
 #include <stdexcept>
 #include <iostream>
+#include "ldapp/entry.hpp"
+#include "ldapp/utility.hpp"
 
 
 namespace ldapp
@@ -20,38 +22,6 @@ namespace ldapp
         this->m_Connected = true;
     }
 
-    void instance::print_entry(LDAPMessage* entry)
-    {
-        berelement* ber;
-        berval* bvals;
-        berval** bvalsp = &bvals;
-        berval bv;
-        auto rc = handle_ldap_function(
-            ldap_get_dn_ber,
-            this->m_Ptr.get(),
-            entry,
-            &ber,
-            &bv
-        );
-        for (rc = handle_ldap_function(ldap_get_attribute_ber, this->m_Ptr.get(), entry, ber, &bv, bvalsp);
-             rc == result::SUCCESS;
-             rc == handle_ldap_function(ldap_get_attribute_ber, this->m_Ptr.get(), entry, ber, &bv, bvalsp))
-        {
-            if (bv.bv_val == nullptr) break;
-            if (bvals)
-            {
-                for (auto i = 0; bvals[i].bv_val != nullptr; ++i)
-                {
-                    std::cout << "\t" <<  bv.bv_val << ": \"" << bvals[i].bv_val << "\"\n";
-                }
-                ber_memfree(bvals);
-            }
-
-        }
-
-        if (ber) ber_free(ber, 0);
-
-    }
     void instance::sasl_bind(const std::string_view binddn, const std::string_view password)
     {
         if (!this->m_Connected) throw std::runtime_error("Can't bind: No connection is opened");
@@ -95,16 +65,34 @@ namespace ldapp
             &res
         );
 
+        auto msg_ptr = message_ptr(std::move(res));
+
         int res_count = 0;
-        for (auto msg = ldap_first_message(this->m_Ptr.get(), res);
+        std::vector<entry> entries{};
+        for (auto msg = ldap_first_message(this->m_Ptr.get(), msg_ptr.get());
                   msg != nullptr;
                   msg = ldap_next_message(this->m_Ptr.get(), msg))
         {
-            std::cout << "Object:\n";
-            print_entry(msg);
+            if (msg == nullptr) break;
+            switch (ldap_msgtype(msg))
+            {
+            case 100:
+                entries.emplace_back(this->m_Ptr.get(), msg);
+                break;
+            default:
+                break;
+            }
         }
 
-        ldap_msgfree(res);
+        for (auto& entry : entries)
+        {
+            std::cout << "New Entry:\n";
+            for (auto& attr : entry.get_attributes())
+            {
+                std::cout << attr.get_name() << "=" << attr.get_value() << "\n";
+            }
+            std::cout << "\n";
+        }
     }
 
     LDAP* instance::initialize(const std::string_view ldap_path)

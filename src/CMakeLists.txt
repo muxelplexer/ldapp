@@ -1,4 +1,6 @@
 add_library(ldapp 
+    attribute.cpp
+    entry.cpp
     ldapp.cpp
     result.cpp
     sasl_connection.cpp

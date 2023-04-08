@@ -1,6 +1,7 @@
 #include "ldapp/sasl_connection.hpp"
 #include "ldapp/result.hpp"
 #include "ldapp/exception.hpp"
+#include "ldapp/utility.hpp"
 
 namespace ldapp
 {

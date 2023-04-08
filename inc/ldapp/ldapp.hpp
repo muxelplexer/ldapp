@@ -50,7 +50,6 @@ namespace ldapp
 
     private:
         static LDAP* initialize(const std::string_view ldap_path);
-        void print_entry(LDAPMessage* entry);
         control_ptr m_SCtrl = nullptr;
         control_ptr m_CCtrl = nullptr;
         ldap_ptr m_Ptr = nullptr;
